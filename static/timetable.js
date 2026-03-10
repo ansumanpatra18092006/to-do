@@ -24,21 +24,21 @@ function parseLocalDate(ds){
 }
 
 function formatLocalDate(date){
-  const y = date.getFullYear()
-  const m = String(date.getMonth()+1).padStart(2,'0')
-  const d = String(date.getDate()).padStart(2,'0')
+  const y=date.getFullYear()
+  const m=String(date.getMonth()+1).padStart(2,'0')
+  const d=String(date.getDate()).padStart(2,'0')
   return `${y}-${m}-${d}`
 }
 
 function fmt12(t){
   if(!t) return ''
-  const [h,m] = t.split(':').map(Number)
-  const ap = h>=12 ? 'PM':'AM'
+  const [h,m]=t.split(':').map(Number)
+  const ap=h>=12?'PM':'AM'
   return `${h%12||12}:${String(m).padStart(2,'0')} ${ap}`
 }
 
 function fmt12h(hour){
-  const ap = hour>=12?'PM':'AM'
+  const ap=hour>=12?'PM':'AM'
   return `${hour%12||12}:00 ${ap}`
 }
 
@@ -48,21 +48,21 @@ function toHour(timeStr){
 }
 
 function fmtDateLabel(ds){
-  const d = parseLocalDate(ds)
-  const today = new Date()
+  const d=parseLocalDate(ds)
+  const today=new Date()
 
-  const isToday = d.toDateString() === today.toDateString()
+  const isToday=d.toDateString()===today.toDateString()
 
   return d.toLocaleDateString(
     'en-US',
     {weekday:'long',month:'long',day:'numeric'}
-  ) + (isToday ? ' — Today':'')
+  )+(isToday?' — Today':'')
 }
 
 
-/* ── API helper (SAFE) ─────────────── */
+/* ── API helper ───────────── */
 
-async function apiCall(url, method='GET', body){
+async function apiCall(url,method='GET',body){
 
   try{
 
@@ -71,23 +71,23 @@ async function apiCall(url, method='GET', body){
       headers:{'Content-Type':'application/json'}
     }
 
-    if(body) opts.body = JSON.stringify(body)
+    if(body) opts.body=JSON.stringify(body)
 
-    const r = await fetch(url,opts)
+    const r=await fetch(url,opts)
 
     if(!r.ok){
-      console.error("API error:", r.status)
+      console.error("API error:",r.status)
       return []
     }
 
-    if(method==='DELETE' || r.status===204)
+    if(method==='DELETE'||r.status===204)
       return null
 
     return await r.json()
 
   }catch(err){
 
-    console.error("Network error:", err)
+    console.error("Network error:",err)
     return []
 
   }
@@ -95,13 +95,14 @@ async function apiCall(url, method='GET', body){
 }
 
 
-/* ── Toast ───────────────────────── */
+/* ── Toast ───────────── */
 
 function showToast(msg){
+
   const el=document.getElementById('toast')
   if(!el) return
 
-  el.textContent = msg
+  el.textContent=msg
   el.classList.add('show')
 
   clearTimeout(showToast._t)
@@ -109,6 +110,7 @@ function showToast(msg){
   showToast._t=setTimeout(()=>{
     el.classList.remove('show')
   },2800)
+
 }
 
 
@@ -116,36 +118,35 @@ function showToast(msg){
 
 function positionNowLine(){
 
-  const now = new Date()
-  const line = document.getElementById('now-line')
-
+  const now=new Date()
+  const line=document.getElementById('now-line')
   if(!line) return
 
-  const today = now.toISOString().split('T')[0]
+  const today=now.toISOString().split('T')[0]
 
-  if(today !== ttDate){
+  if(today!==ttDate){
     line.style.display='none'
     return
   }
 
-  const h = now.getHours()
-  const m = now.getMinutes()
+  const h=now.getHours()
+  const m=now.getMinutes()
 
-  if(h<6 || h>23){
+  if(h<6||h>23){
     line.style.display='none'
     return
   }
 
-  const row = document.querySelector(`[data-hour="${h}"]`)
+  const row=document.querySelector(`[data-hour="${h}"]`)
   if(!row) return
 
-  const rect = row.getBoundingClientRect()
-  const gridRect = document.getElementById('tt-grid').getBoundingClientRect()
+  const rect=row.getBoundingClientRect()
+  const gridRect=document.getElementById('tt-grid').getBoundingClientRect()
 
-  const top = rect.top-gridRect.top+(m/60)*rect.height
+  const top=rect.top-gridRect.top+(m/60)*rect.height
 
   line.style.display='block'
-  line.style.top = top+"px"
+  line.style.top=top+"px"
 
 }
 
@@ -154,24 +155,24 @@ function positionNowLine(){
 
 function renderTimetable(){
 
-  const grid = document.getElementById('tt-grid')
-  const now = new Date()
-  const currentH = now.getHours()
+  const grid=document.getElementById('tt-grid')
+  const now=new Date()
+  const currentH=now.getHours()
 
   document.getElementById('tt-date-label')
-  .textContent = fmtDateLabel(ttDate)
+  .textContent=fmtDateLabel(ttDate)
 
   grid.innerHTML=''
 
   HOURS.forEach(h=>{
 
-    const tasks = ttTasks.filter(t => toHour(t.start_time) === h)
+    const tasks=ttTasks.filter(t=>toHour(t.start_time)===h)
 
     const row=document.createElement('div')
     row.className='tt-row'
     row.dataset.hour=h
 
-    if(ttDate===formatLocalDate(now) && h===currentH)
+    if(ttDate===formatLocalDate(now)&&h===currentH)
       row.classList.add('current-hour')
 
     const hourEl=document.createElement('div')
@@ -188,7 +189,7 @@ function renderTimetable(){
 
       let timeLabel=''
 
-      if(t.start_time && t.end_time)
+      if(t.start_time&&t.end_time)
       timeLabel=`<div class="tt-time-range">
         ${fmt12(t.start_time)} → ${fmt12(t.end_time)}
       </div>`
@@ -206,11 +207,10 @@ function renderTimetable(){
 
       pill.addEventListener('click',async e=>{
 
-        if(e.target.classList.contains('del-pill'))
-        return
+        if(e.target.classList.contains('del-pill')) return
 
         await apiCall(`/api/tasks/${t.id}`,'PUT',{
-          completed: t.completed?0:1
+          completed:t.completed?0:1
         })
 
         loadTimetable()
@@ -222,8 +222,7 @@ function renderTimetable(){
 
         e.stopPropagation()
 
-        if(!confirm(`Delete "${t.title}"?`))
-        return
+        if(!confirm(`Delete "${t.title}"?`)) return
 
         await apiCall(`/api/tasks/${t.id}`,'DELETE')
 
@@ -258,9 +257,9 @@ function renderTimetable(){
 
 async function loadTimetable(){
 
-  const tasks = await apiCall(`/api/tasks?date=${ttDate}`)
+  const tasks=await apiCall(`/api/tasks?date=${ttDate}`)
 
-  ttTasks = tasks.filter(t=>t.start_time)
+  ttTasks=tasks.filter(t=>t.start_time)
 
   renderTimetable()
 
@@ -277,56 +276,40 @@ document.getElementById('tt-next')
 
 document.getElementById('tt-today')
 .addEventListener('click',()=>{
-  ttDate = formatLocalDate(new Date())
+  ttDate=formatLocalDate(new Date())
   loadTimetable()
 })
 
 function changeDay(step){
 
-  const dt = parseLocalDate(ttDate)
-
+  const dt=parseLocalDate(ttDate)
   dt.setDate(dt.getDate()+step)
 
-  ttDate = formatLocalDate(dt)
+  ttDate=formatLocalDate(dt)
 
   loadTimetable()
 
 }
 
 
-/* ── Date input sync ───────────── */
+/* ── Modal controls ───────────── */
 
-function syncDateInput(){
-
-  const inp = document.getElementById('tt-date-inp')
-
-  if(!inp) return
-
-  inp.value = ttDate
-
-  inp.addEventListener('change',()=>{
-    ttDate = inp.value
-    loadTimetable()
-  })
-
+function closeModal(){
+  const overlay=document.getElementById('modal-overlay')
+  if(overlay) overlay.classList.remove('open')
 }
-
-
-/* ── Modal ───────────────────── */
 
 function openAddModal(hour){
 
-  modalHour = hour
+  modalHour=hour
 
   const overlay=document.getElementById('modal-overlay')
-
   const h=String(hour).padStart(2,'0')
 
   document.getElementById('m-start').value=`${h}:00`
   document.getElementById('m-end').value=`${h}:00`
 
   document.getElementById('m-date').value=ttDate
-
   document.getElementById('m-title').value=''
   document.getElementById('m-desc').value=''
 
@@ -343,7 +326,6 @@ document.getElementById('modal-form')
   e.preventDefault()
 
   const title=document.getElementById('m-title').value.trim()
-
   if(!title) return
 
   await apiCall('/api/tasks','POST',{
@@ -354,19 +336,39 @@ document.getElementById('modal-form')
     end_time:document.getElementById('m-end').value
   })
 
-  document.getElementById('modal-overlay')
-  .classList.remove('open')
-
+  closeModal()
   loadTimetable()
-
   showToast("Task scheduled")
 
 })
 
 
-/* ── Init ───────────────────── */
+/* ── Cancel button ───────────── */
 
-syncDateInput()
+const cancelBtn=document.getElementById('modal-cancel')
+if(cancelBtn){
+  cancelBtn.addEventListener('click',closeModal)
+}
+
+
+/* ── Click outside modal ───────── */
+
+const overlay=document.getElementById('modal-overlay')
+if(overlay){
+  overlay.addEventListener('click',e=>{
+    if(e.target===overlay) closeModal()
+  })
+}
+
+
+/* ── ESC closes modal ───────── */
+
+document.addEventListener('keydown',e=>{
+  if(e.key==="Escape") closeModal()
+})
+
+
+/* ── Init ───────────── */
+
 loadTimetable()
-
 setInterval(positionNowLine,60000)
