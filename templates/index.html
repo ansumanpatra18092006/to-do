@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planner — Tasks</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+
+    <nav>
+        <a class="nav-brand" href="/">Plan<em>ner</em></a>
+
+        <div class="nav-links">
+            <a class="nav-link active" href="/">Tasks</a>
+            <a class="nav-link" href="/timetable">Timetable</a>
+            <a class="nav-link" href="/calendar">Calendar</a>
+            <a class="nav-link" href="/stats">Stats</a>
+        </div>
+    </nav>
+
+
+    <div class="page">
+
+        <div class="page-header">
+            <h1 class="page-title">My <em>Tasks</em></h1>
+            <p class="page-sub">Track everything that needs to get done.</p>
+        </div>
+
+
+        <form class="add-form" id="add-form">
+
+            <div class="form-row">
+
+                <input id="f-title" class="form-input" type="text" placeholder="Task title…" required maxlength="120"
+                    style="flex:2">
+
+                <input id="f-desc" class="form-input" type="text" placeholder="Description (optional)">
+
+            </div>
+
+
+            <div class="form-row">
+
+                <!-- DUE DATE -->
+                <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:140px">
+                    <label class="form-label">Due Date</label>
+                    <input id="f-due" class="form-input" type="date">
+                </div>
+
+
+                <!-- START TIME -->
+                <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:140px">
+
+                    <label class="form-label">Start Time</label>
+
+                    <input id="f-start" class="form-input" type="text" placeholder="e.g. 2 PM or 2:30 PM">
+
+                </div>
+
+
+                <!-- END TIME -->
+                <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:140px">
+
+                    <label class="form-label">End Time</label>
+
+                    <input id="f-end" class="form-input" type="text" placeholder="e.g. 3 PM or 3:30 PM">
+
+                </div>
+
+
+                <div style="display:flex;align-items:flex-end">
+
+                    <button type="submit" class="btn btn-primary">
+                        + Add Task
+                    </button>
+
+                </div>
+
+            </div>
+
+        </form>
+
+
+
+        <div class="filters">
+
+            <button class="filter-btn active" data-filter="all">
+                All
+            </button>
+
+            <button class="filter-btn" data-filter="pending">
+                Pending
+            </button>
+
+            <button class="filter-btn" data-filter="completed">
+                Completed
+            </button>
+
+        </div>
+
+
+        <div id="task-list"></div>
+
+    </div>
+
+
+    <div id="toast"></div>
+
+    <script src="/static/script.js"></script>
+
+</body>
+
+</html>

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planner — Stats</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+
+    <nav>
+        <a class="nav-brand" href="/">Plan<em>ner</em></a>
+        <div class="nav-links">
+            <a class="nav-link" href="/">Tasks</a>
+            <a class="nav-link" href="/timetable">Timetable</a>
+            <a class="nav-link" href="/calendar">Calendar</a>
+            <a class="nav-link active" href="/stats">Stats</a>
+        </div>
+    </nav>
+
+    <div class="page">
+        <div class="page-header">
+            <h1 class="page-title">Productivity <em>Stats</em></h1>
+            <p class="page-sub">How are you tracking? Here's the big picture.</p>
+        </div>
+
+        <!-- Stat cards -->
+        <div class="stats-grid" id="stats-grid"></div>
+
+        <!-- Completion rate bar -->
+        <div class="progress-wrap">
+            <div class="progress-head">
+                <span>Overall Completion Rate</span>
+                <strong id="rate-val">0%</strong>
+            </div>
+            <div class="progress-track">
+                <div class="progress-fill" id="rate-fill" style="width:0%"></div>
+            </div>
+        </div>
+
+        <!-- 7-day bar chart -->
+        <div class="chart-section">
+            <div class="chart-title">Tasks Completed — Last 7 Days</div>
+            <div class="bar-chart" id="bar-chart"></div>
+        </div>
+    </div>
+
+    <script>
+        async function loadStats() {
+            const s = await fetch('/api/stats').then(r => r.json());
+
+            document.getElementById('stats-grid').innerHTML = `
+    <div class="stat-card green">
+      <div class="stat-val">${s.completed}</div>
+      <div class="stat-label">Total Completed</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val">${s.pending}</div>
+      <div class="stat-label">Pending</div>
+    </div>
+    <div class="stat-card red">
+      <div class="stat-val">${s.overdue}</div>
+      <div class="stat-label">Overdue</div>
+    </div>
+    <div class="stat-card amber">
+      <div class="stat-val">${s.week_done}</div>
+      <div class="stat-label">Done This Week</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val">${s.month_done}</div>
+      <div class="stat-label">Done This Month</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val">${s.total}</div>
+      <div class="stat-label">Total Tasks</div>
+    </div>
+  `;
+
+            // Progress bar (animate on next frame)
+            document.getElementById('rate-val').textContent = s.rate + '%';
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                document.getElementById('rate-fill').style.width = s.rate + '%';
+            }));
+
+            // Build last-7-days map
+            const chart = document.getElementById('bar-chart');
+            const today = new Date();
+            const days = [];
+            for (let i = 6; i >= 0; i--) {
+                const d = new Date(today);
+                d.setDate(today.getDate() - i);
+                const iso = d.toISOString().split('T')[0];
+                const rec = s.daily.find(r => r.day === iso);
+                days.push({
+                    label: d.toLocaleDateString('en-US', { weekday: 'short' }),
+                    count: rec ? rec.count : 0
+                });
+            }
+
+            const max = Math.max(...days.map(d => d.count), 1);
+            chart.innerHTML = '';
+            days.forEach(d => {
+                const h = Math.max(4, (d.count / max) * 110);
+                const col = document.createElement('div');
+                col.className = 'bar-col';
+                col.innerHTML = `
+      <div class="bar" data-v="${d.count}" style="height:${h}px"></div>
+      <div class="bar-label">${d.label}</div>`;
+                chart.appendChild(col);
+            });
+        }
+
+        loadStats();
+    </script>
+</body>
+
+</html>

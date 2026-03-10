@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planner — Calendar</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+
+    <nav>
+        <a class="nav-brand" href="/">Plan<em>ner</em></a>
+        <div class="nav-links">
+            <a class="nav-link" href="/">Tasks</a>
+            <a class="nav-link" href="/timetable">Timetable</a>
+            <a class="nav-link active" href="/calendar">Calendar</a>
+            <a class="nav-link" href="/stats">Stats</a>
+        </div>
+    </nav>
+
+    <div class="page">
+        <div class="page-header">
+            <h1 class="page-title">Task <em>Calendar</em></h1>
+            <p class="page-sub">See your tasks laid out across the month. Click any day for details.</p>
+        </div>
+
+        <!-- Month navigation -->
+        <div class="cal-nav">
+            <button class="btn btn-ghost" id="cal-prev">← Prev</button>
+            <h2 class="cal-month-title" id="cal-month-title"></h2>
+            <button class="btn btn-ghost" id="cal-next">Next →</button>
+        </div>
+
+        <!-- Calendar -->
+        <div id="cal-day-header" class="cal-header"></div>
+        <div id="cal-grid" class="cal-grid"></div>
+
+        <!-- Day detail panel -->
+        <div class="day-panel" id="day-panel">
+            <div class="day-panel-title"></div>
+            <div class="day-task-list"></div>
+        </div>
+
+        <!-- Legend -->
+        <div class="cal-legend">
+            <div class="legend-item">
+                <div class="legend-dot" style="background:var(--navy3);border:1px solid var(--border2)"></div>
+                Has tasks
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background:rgba(224,82,82,0.15);border-left:3px solid var(--red)"></div>
+                Has overdue
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background:transparent;border:1px solid var(--amber)"></div>
+                Today
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/calendar.js"></script>
+</body>
+
+</html>

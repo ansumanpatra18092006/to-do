@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planner — Timetable</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+
+    <nav>
+        <a class="nav-brand" href="/">Plan<em>ner</em></a>
+        <div class="nav-links">
+            <a class="nav-link" href="/">Tasks</a>
+            <a class="nav-link active" href="/timetable">Timetable</a>
+            <a class="nav-link" href="/calendar">Calendar</a>
+            <a class="nav-link" href="/stats">Stats</a>
+        </div>
+    </nav>
+
+    <div class="page">
+        <div class="page-header">
+            <h1 class="page-title">Daily <em>Timetable</em></h1>
+            <p class="page-sub">Schedule your day hour by hour. Click any slot to add a task.</p>
+        </div>
+
+        <!-- Date navigation -->
+        <div class="tt-date-nav">
+            <button class="btn btn-ghost" id="tt-prev">← Prev</button>
+            <h2 class="tt-date-label" id="tt-date-label"></h2>
+            <input type="date" id="tt-date-inp" class="form-input" style="width:auto;max-width:180px">
+            <button class="btn btn-ghost" id="tt-today">Today</button>
+            <button class="btn btn-ghost" id="tt-next">Next →</button>
+        </div>
+
+        <!-- Timetable grid -->
+        <div style="position:relative">
+            <div class="tt-grid" id="tt-grid"></div>
+            <div class="tt-now-line" id="now-line" style="display:none"></div>
+        </div>
+
+        <p style="margin-top:14px;font-size:0.78rem;color:var(--slate)">
+            💡 Click any hour slot to schedule a task. The amber line marks the current time.
+        </p>
+    </div>
+
+    <!-- Add Task Modal -->
+    <div class="modal-overlay" id="modal-overlay">
+        <div class="modal">
+            <div class="modal-title">Schedule a Task</div>
+            <form id="modal-form">
+                <div style="margin-bottom:12px">
+                    <label class="form-label">Title *</label>
+                    <input id="m-title" class="form-input" type="text" placeholder="What are you working on?" required
+                        maxlength="120">
+                </div>
+                <div style="margin-bottom:12px">
+                    <label class="form-label">Description</label>
+                    <input id="m-desc" class="form-input" type="text" placeholder="Optional details…">
+                </div>
+                <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+                    <div style="flex:1;min-width:120px">
+                        <label class="form-label">Date</label>
+                        <input id="m-date" class="form-input" type="date">
+                    </div>
+                    <div style="flex:1;min-width:110px">
+                        <label class="form-label">Start Time</label>
+                        <input id="m-start" class="form-input" type="time">
+                    </div>
+                    <div style="flex:1;min-width:110px">
+                        <label class="form-label">End Time</label>
+                        <input id="m-end" class="form-input" type="time">
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-ghost" id="modal-cancel">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Schedule</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="toast"></div>
+    <script src="/static/timetable.js"></script>
+</body>
+
+</html>
