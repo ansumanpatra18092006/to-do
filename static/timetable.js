@@ -8,6 +8,23 @@ let ttTasks = []
 let modalHour = null
 
 
+function syncDateInput(){
+
+  const inp = document.getElementById('tt-date-inp')
+
+  if(!inp) return
+
+  inp.value = ttDate
+
+  inp.addEventListener('change', () => {
+
+    ttDate = inp.value
+    loadTimetable()
+
+  })
+
+}
+
 /* ── Helpers ───────────────────────── */
 
 function escHtml(s){
@@ -370,5 +387,6 @@ document.addEventListener('keydown',e=>{
 
 /* ── Init ───────────── */
 
+syncDateInput()
 loadTimetable()
 setInterval(positionNowLine,60000)
