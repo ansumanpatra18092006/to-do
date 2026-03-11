@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Planner — Timetable</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="static/style.css">
 </head>
 
 <body>
@@ -21,6 +21,7 @@
     </nav>
 
     <div class="page">
+
         <div class="page-header">
             <h1 class="page-title">Daily <em>Timetable</em></h1>
             <p class="page-sub">Schedule your day hour by hour. Click any slot to add a task.</p>
@@ -44,6 +45,7 @@
         <p style="margin-top:14px;font-size:0.78rem;color:var(--slate)">
             💡 Click any hour slot to schedule a task. The amber line marks the current time.
         </p>
+
     </div>
 
     <!-- Add Task Modal -->
@@ -51,15 +53,18 @@
         <div class="modal">
             <div class="modal-title">Schedule a Task</div>
             <form id="modal-form">
+
                 <div style="margin-bottom:12px">
                     <label class="form-label">Title *</label>
                     <input id="m-title" class="form-input" type="text" placeholder="What are you working on?" required
                         maxlength="120">
                 </div>
+
                 <div style="margin-bottom:12px">
                     <label class="form-label">Description</label>
                     <input id="m-desc" class="form-input" type="text" placeholder="Optional details…">
                 </div>
+
                 <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">
                     <div style="flex:1;min-width:120px">
                         <label class="form-label">Date</label>
@@ -74,16 +79,21 @@
                         <input id="m-end" class="form-input" type="time">
                     </div>
                 </div>
+
                 <div class="modal-actions">
                     <button type="button" class="btn btn-ghost" id="modal-cancel">Cancel</button>
                     <button type="submit" class="btn btn-primary">Schedule</button>
                 </div>
+
             </form>
         </div>
     </div>
 
     <div id="toast"></div>
-    <script src="/static/timetable.js"></script>
+    <!-- db.js must load before timetable.js -->
+    <script src="static/db.js"></script>
+    <script src="static/timetable.js"></script>
+
 </body>
 
 </html>
