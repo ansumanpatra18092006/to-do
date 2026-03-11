@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify
 import sqlite3
 import os
 from datetime import date
+import subprocess
 
 app = Flask(__name__)
 
@@ -9,7 +10,26 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB = os.path.join(BASE_DIR, "database.db")
 
 
-# ── Database helpers ────────────────────────────────
+# ─────────────────────────────────────────
+# Auto save database to GitHub
+# ─────────────────────────────────────────
+
+def save_db():
+    try:
+        subprocess.run(["git", "config", "--global", "user.email", "bot@example.com"])
+        subprocess.run(["git", "config", "--global", "user.name", "RenderBot"])
+
+        subprocess.run(["git", "add", "database.db"])
+        subprocess.run(["git", "commit", "-m", "update database"], check=False)
+        subprocess.run(["git", "push"])
+
+    except Exception as e:
+        print("DB save failed:", e)
+
+
+# ─────────────────────────────────────────
+# Database helpers
+# ─────────────────────────────────────────
 
 def get_db():
     conn = sqlite3.connect(DB)
@@ -18,6 +38,7 @@ def get_db():
 
 
 def init_db():
+
     conn = get_db()
 
     conn.execute("""
@@ -37,35 +58,39 @@ def init_db():
     conn.close()
 
 
-# ── Pages ───────────────────────────────────────────
+# ─────────────────────────────────────────
+# Pages
+# ─────────────────────────────────────────
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template("index.html")
 
 
 @app.route('/timetable')
 def timetable():
-    return render_template('timetable.html')
+    return render_template("timetable.html")
 
 
 @app.route('/calendar')
-def calendar_pg():
-    return render_template('calendar.html')
+def calendar():
+    return render_template("calendar.html")
 
 
 @app.route('/stats')
-def stats_pg():
-    return render_template('stats.html')
+def stats():
+    return render_template("stats.html")
 
 
-# ── Tasks API ───────────────────────────────────────
+# ─────────────────────────────────────────
+# Tasks API
+# ─────────────────────────────────────────
 
 @app.route('/api/tasks', methods=['GET'])
 def get_tasks():
 
-    f = request.args.get('filter', 'all')
-    dt = request.args.get('date')
+    f = request.args.get("filter", "all")
+    dt = request.args.get("date")
 
     conn = get_db()
 
@@ -91,7 +116,7 @@ def get_tasks():
 
 
 @app.route('/api/tasks/today')
-def get_today():
+def today_tasks():
 
     today = date.today().isoformat()
 
@@ -114,18 +139,17 @@ def create_task():
 
     conn = get_db()
 
-    cur = conn.execute(
-        """INSERT INTO tasks
+    cur = conn.execute("""
+        INSERT INTO tasks
         (title, description, due_date, start_time, end_time)
-        VALUES (?, ?, ?, ?, ?)""",
-        (
-            data.get("title"),
-            data.get("description", ""),
-            data.get("due_date") or None,
-            data.get("start_time") or None,
-            data.get("end_time") or None
-        )
-    )
+        VALUES (?, ?, ?, ?, ?)
+    """, (
+        data.get("title"),
+        data.get("description", ""),
+        data.get("due_date") or None,
+        data.get("start_time") or None,
+        data.get("end_time") or None
+    ))
 
     conn.commit()
 
@@ -136,25 +160,9 @@ def create_task():
 
     conn.close()
 
+    save_db()
+
     return jsonify(dict(task)), 201
-
-
-@app.route('/api/tasks/<int:tid>', methods=['GET'])
-def get_task(tid):
-
-    conn = get_db()
-
-    row = conn.execute(
-        "SELECT * FROM tasks WHERE id=?",
-        (tid,)
-    ).fetchone()
-
-    conn.close()
-
-    if not row:
-        return jsonify({"error": "not found"}), 404
-
-    return jsonify(dict(row))
 
 
 @app.route('/api/tasks/<int:tid>', methods=['PUT'])
@@ -196,6 +204,8 @@ def update_task(tid):
 
     conn.close()
 
+    save_db()
+
     return jsonify(dict(task))
 
 
@@ -212,10 +222,14 @@ def delete_task(tid):
     conn.commit()
     conn.close()
 
+    save_db()
+
     return jsonify({"ok": True})
 
 
-# ── Stats API ───────────────────────────────────────
+# ─────────────────────────────────────────
+# Stats API
+# ─────────────────────────────────────────
 
 @app.route('/api/stats')
 def get_stats():
@@ -273,10 +287,17 @@ def get_stats():
     })
 
 
-# ── Start Server ─────────────────────────────────────
+# ─────────────────────────────────────────
+# Start Server
+# ─────────────────────────────────────────
 
 init_db()
 
 if __name__ == "__main__":
+
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+
+    app.run(
+        host="0.0.0.0",
+        port=port
+    )
