@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planner — Stats</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+
+    <nav>
+        <a class="nav-brand" href="/">Plan<em>ner</em></a>
+        <div class="nav-links">
+            <a class="nav-link" href="/">Tasks</a>
+            <a class="nav-link" href="/timetable">Timetable</a>
+            <a class="nav-link" href="/calendar">Calendar</a>
+            <a class="nav-link active" href="/stats">Stats</a>
+        </div>
+    </nav>
+
+    <div class="page">
+
+        <div class="page-header">
+            <h1 class="page-title">Productivity <em>Stats</em></h1>
+            <p class="page-sub">How are you tracking? Here's the big picture.</p>
+        </div>
+
+        <!-- Stat cards -->
+        <div class="stats-grid" id="stats-grid"></div>
+
+        <!-- Completion rate bar -->
+        <div class="progress-wrap">
+            <div class="progress-head">
+                <span>Overall Completion Rate</span>
+                <strong id="rate-val">0%</strong>
+            </div>
+            <div class="progress-track">
+                <div class="progress-fill" id="rate-fill" style="width:0%"></div>
+            </div>
+        </div>
+
+        <!-- 7-day bar chart -->
+        <div class="chart-section">
+            <div class="chart-title">Tasks Completed — Last 7 Days</div>
+            <div class="bar-chart" id="bar-chart"></div>
+        </div>
+
+    </div>
+
+    <!-- db.js must load before the inline stats script -->
+    <script src="/static/db.js"></script>
+    <script>
+        "use strict";
+
+        /* ── Date helpers ────────────────────────────────────── */
+
+        function toLocalISO(date) {
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, "0");
+            const d = String(date.getDate()).padStart(2, "0");
+            return `${y}-${m}-${d}`;
+        }
+
+        /** Return YYYY-WW  (ISO week number within the local year) */
+        function isoWeek(dateStr) {
+            const d = new Date(dateStr + "T00:00:00");
+            // Thursday in current week decides the year
+            d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+            const yearStart = new Date(d.getFullYear(), 0, 1);
+            const week = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+            return `${d.getFullYear()}-${String(week).padStart(2, "0")}`;
+        }
+
+        function todayISO() { return toLocalISO(new Date()); }
+        function monthISO() { return todayISO().slice(0, 7); }   // YYYY-MM
+        function weekISO() { return isoWeek(todayISO()); }
+
+        /* ── Calculate stats from task array ─────────────────── */
+
+        function calcStats(tasks) {
+            const today = todayISO();
+            const week = weekISO();
+            const month = monthISO();
+
+            const total = tasks.length;
+            const completed = tasks.filter((t) => t.completed).length;
+            const pending = total - completed;
+
+            const overdue = tasks.filter(
+                (t) => !t.completed && t.due_date && t.due_date < today
+            ).length;
+
+            const week_done = tasks.filter(
+                (t) => t.completed && t.due_date && isoWeek(t.due_date) === week
+            ).length;
+
+            const month_done = tasks.filter(
+                (t) => t.completed && t.due_date && t.due_date.slice(0, 7) === month
+            ).length;
+
+            const rate = total ? Math.round((completed / total) * 100) : 0;
+
+            /* 7-day daily completion counts */
+            const dailyMap = {};
+            for (let i = 6; i >= 0; i--) {
+                const d = new Date();
+                d.setDate(d.getDate() - i);
+                dailyMap[toLocalISO(d)] = 0;
+            }
+            tasks.forEach((t) => {
+                if (t.completed && t.due_date && dailyMap.hasOwnProperty(t.due_date)) {
+                    dailyMap[t.due_date]++;
+                }
+            });
+
+            const daily = Object.entries(dailyMap).map(([day, count]) => ({ day, count }));
+
+            return { total, completed, pending, overdue, week_done, month_done, rate, daily };
+        }
+
+        /* ── Render ──────────────────────────────────────────── */
+
+        function renderStats(s) {
+            /* Stat cards */
+            document.getElementById("stats-grid").innerHTML = `
+        <div class="stat-card green">
+          <div class="stat-val">${s.completed}</div>
+          <div class="stat-label">Total Completed</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val">${s.pending}</div>
+          <div class="stat-label">Pending</div>
+        </div>
+        <div class="stat-card red">
+          <div class="stat-val">${s.overdue}</div>
+          <div class="stat-label">Overdue</div>
+        </div>
+        <div class="stat-card amber">
+          <div class="stat-val">${s.week_done}</div>
+          <div class="stat-label">Done This Week</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val">${s.month_done}</div>
+          <div class="stat-label">Done This Month</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val">${s.total}</div>
+          <div class="stat-label">Total Tasks</div>
+        </div>`;
+
+            /* Completion rate bar — animate after paint */
+            document.getElementById("rate-val").textContent = s.rate + "%";
+            requestAnimationFrame(() =>
+                requestAnimationFrame(() => {
+                    document.getElementById("rate-fill").style.width = s.rate + "%";
+                })
+            );
+
+            /* 7-day bar chart */
+            const chart = document.getElementById("bar-chart");
+            const max = Math.max(...s.daily.map((d) => d.count), 1);
+            chart.innerHTML = "";
+
+            s.daily.forEach((d) => {
+                const date = new Date(d.day + "T00:00:00");
+                const label = date.toLocaleDateString("en-US", { weekday: "short" });
+                const h = Math.max(4, (d.count / max) * 110);
+                const col = document.createElement("div");
+                col.className = "bar-col";
+                col.innerHTML = `
+          <div class="bar" data-v="${d.count}" style="height:${h}px"></div>
+          <div class="bar-label">${label}</div>`;
+                chart.appendChild(col);
+            });
+        }
+
+        /* ── Load from IndexedDB ─────────────────────────────── */
+
+        async function loadStats() {
+            try {
+                const tasks = await getTasks();
+                renderStats(calcStats(tasks));
+            } catch (err) {
+                console.error("Stats: failed to load tasks:", err);
+                document.getElementById("stats-grid").innerHTML =
+                    `<p style="color:var(--red);grid-column:1/-1">Could not load statistics.</p>`;
+            }
+        }
+
+        loadStats();
+    </script>
+
+</body>
+
+</html>

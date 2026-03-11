@@ -1,392 +1,275 @@
-/* timetable.js — daily hourly schedule */
+/* =============================================================
+   timetable.js  —  Daily hourly schedule
+   All fetch() calls replaced with IndexedDB (db.js).
+   ============================================================= */
 
-const HOURS = []
-for(let h=6; h<=23; h++) HOURS.push(h)
+"use strict";
 
-let ttDate = formatLocalDate(new Date())
-let ttTasks = []
-let modalHour = null
+/* ── Standalone helpers (safe if script.js not on same page) ── */
 
-
-function syncDateInput(){
-
-  const inp = document.getElementById('tt-date-inp')
-
-  if(!inp) return
-
-  inp.value = ttDate
-
-  inp.addEventListener('change', () => {
-
-    ttDate = inp.value
-    loadTimetable()
-
-  })
-
+if (typeof escHtml === "undefined") {
+  window.escHtml = (s) =>
+    String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
 
-/* ── Helpers ───────────────────────── */
-
-function escHtml(s){
-  return String(s)
-  .replace(/&/g,'&amp;')
-  .replace(/</g,'&lt;')
-  .replace(/>/g,'&gt;')
-  .replace(/"/g,'&quot;')
+if (typeof fmt12 === "undefined") {
+  window.fmt12 = (t) => {
+    if (!t) return "";
+    const [h, m] = t.split(":").map(Number);
+    return `${h % 12 || 12}:${String(m).padStart(2,"0")} ${h >= 12 ? "PM" : "AM"}`;
+  };
 }
 
-function parseLocalDate(ds){
-  const [y,m,d] = ds.split('-').map(Number)
-  return new Date(y,m-1,d)
+/* ── Helpers ─────────────────────────────────────────────────── */
+
+function showToast(msg) {
+  const el = document.getElementById("toast");
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => el.classList.remove("show"), 2800);
 }
 
-function formatLocalDate(date){
-  const y=date.getFullYear()
-  const m=String(date.getMonth()+1).padStart(2,'0')
-  const d=String(date.getDate()).padStart(2,'0')
-  return `${y}-${m}-${d}`
+function toLocalISO(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
-function fmt12(t){
-  if(!t) return ''
-  const [h,m]=t.split(':').map(Number)
-  const ap=h>=12?'PM':'AM'
-  return `${h%12||12}:${String(m).padStart(2,'0')} ${ap}`
+function parseLocalDate(ds) {
+  const [y, m, d] = ds.split("-").map(Number);
+  return new Date(y, m - 1, d);
 }
 
-function fmt12h(hour){
-  const ap=hour>=12?'PM':'AM'
-  return `${hour%12||12}:00 ${ap}`
+function fmt12h(hour) {
+  return `${hour % 12 || 12}:00 ${hour >= 12 ? "PM" : "AM"}`;
 }
 
-function toHour(timeStr){
-  if(!timeStr) return null
-  return parseInt(timeStr.split(':')[0])
+function toHour(timeStr) {
+  if (!timeStr) return null;
+  return parseInt(timeStr.split(":")[0], 10);
 }
 
-function fmtDateLabel(ds){
-  const d=parseLocalDate(ds)
-  const today=new Date()
-
-  const isToday=d.toDateString()===today.toDateString()
-
-  return d.toLocaleDateString(
-    'en-US',
-    {weekday:'long',month:'long',day:'numeric'}
-  )+(isToday?' — Today':'')
+function fmtDateLabel(ds) {
+  const d       = parseLocalDate(ds);
+  const isToday = d.toDateString() === new Date().toDateString();
+  return d.toLocaleDateString("en-US", { weekday:"long", month:"long", day:"numeric" })
+    + (isToday ? " — Today" : "");
 }
 
+/* ── State ───────────────────────────────────────────────────── */
 
-/* ── API helper ───────────── */
+const HOURS = [];
+for (let h = 6; h <= 23; h++) HOURS.push(h);
 
-async function apiCall(url,method='GET',body){
+let ttDate    = toLocalISO(new Date());
+let ttTasks   = [];
+let modalHour = null;
 
-  try{
+/* ── Date input sync ─────────────────────────────────────────── */
 
-    const opts={
-      method,
-      headers:{'Content-Type':'application/json'}
+function syncDateInput() {
+  const inp = document.getElementById("tt-date-inp");
+  if (!inp) return;
+  inp.value = ttDate;
+  inp.addEventListener("input", () => {
+    if (inp.value) { ttDate = inp.value; loadTimetable(); }
+  });
+  inp.addEventListener("change", () => {
+    if (inp.value && inp.value !== ttDate) { ttDate = inp.value; loadTimetable(); }
+  });
+}
+
+/* ── Current-time line ───────────────────────────────────────── */
+
+function positionNowLine() {
+  const line = document.getElementById("now-line");
+  if (!line) return;
+  const now = new Date();
+  if (toLocalISO(now) !== ttDate) { line.style.display = "none"; return; }
+  const h = now.getHours(), m = now.getMinutes();
+  if (h < 6 || h > 23)         { line.style.display = "none"; return; }
+  const row  = document.querySelector(`[data-hour="${h}"]`);
+  const grid = document.getElementById("tt-grid");
+  if (!row || !grid) return;
+  const top = row.getBoundingClientRect().top - grid.getBoundingClientRect().top + (m / 60) * row.getBoundingClientRect().height;
+  line.style.display = "block";
+  line.style.top     = top + "px";
+}
+
+/* ── Render ──────────────────────────────────────────────────── */
+
+function renderTimetable() {
+  const labelEl = document.getElementById("tt-date-label");
+  if (labelEl) labelEl.textContent = fmtDateLabel(ttDate);
+
+  const grid = document.getElementById("tt-grid");
+  if (!grid) return;
+  grid.innerHTML = "";
+
+  const nowH    = new Date().getHours();
+  const isToday = ttDate === toLocalISO(new Date());
+
+  HOURS.forEach((h) => {
+    const tasks = ttTasks.filter((t) => toHour(t.start_time) === h);
+
+    const row = document.createElement("div");
+    row.className    = "tt-row" + (isToday && h === nowH ? " current-hour" : "");
+    row.dataset.hour = h;
+
+    const hourEl = document.createElement("div");
+    hourEl.className   = "tt-hour";
+    hourEl.textContent = fmt12h(h);
+
+    const slot = document.createElement("div");
+    slot.className = "tt-slot" + (tasks.length ? " has-tasks" : "");
+
+    tasks.forEach((t) => slot.appendChild(buildPill(t)));
+
+    slot.addEventListener("click", (e) => {
+      if (e.target.closest(".tt-task-pill")) return;
+      openAddModal(h);
+    });
+
+    row.appendChild(hourEl);
+    row.appendChild(slot);
+    grid.appendChild(row);
+  });
+
+  setTimeout(positionNowLine, 50);
+}
+
+function buildPill(t) {
+  const pill = document.createElement("div");
+  pill.className = "tt-task-pill" + (t.completed ? " done" : "");
+
+  let timeRange = "";
+  if (t.start_time && t.end_time)
+    timeRange = `<div class="tt-time-range">${fmt12(t.start_time)} → ${fmt12(t.end_time)}</div>`;
+
+  pill.innerHTML = `
+    <span class="tt-pill-dot"></span>
+    <div class="tt-pill-content">
+      <div class="tt-pill-title">${escHtml(t.title)}</div>
+      ${timeRange}
+    </div>
+    <button class="del-pill" type="button" title="Delete">✕</button>`;
+
+  /* Toggle completion */
+  pill.addEventListener("click", async (e) => {
+    if (e.target.classList.contains("del-pill")) return;
+    t.completed = t.completed ? 0 : 1;
+    try {
+      await updateTask(t);
+      loadTimetable();
+    } catch (err) { console.error(err); }
+  });
+
+  /* Delete */
+  pill.querySelector(".del-pill").addEventListener("click", async (e) => {
+    e.stopPropagation();
+    if (!confirm(`Delete "${t.title}"?`)) return;
+    try {
+      await deleteTask(t.id);
+      loadTimetable();
+      showToast("Deleted.");
+    } catch (err) { console.error(err); }
+  });
+
+  return pill;
+}
+
+/* ── Load ────────────────────────────────────────────────────── */
+
+async function loadTimetable() {
+  try {
+    const all = await getTasks();
+    // Filter to tasks for the selected date that have a start_time
+    ttTasks = all.filter((t) => t.due_date === ttDate && t.start_time);
+  } catch (err) {
+    console.error("loadTimetable failed:", err);
+    ttTasks = [];
+  }
+  renderTimetable();
+}
+
+/* ── Date navigation ─────────────────────────────────────────── */
+
+document.getElementById("tt-prev").addEventListener("click",  () => changeDay(-1));
+document.getElementById("tt-next").addEventListener("click",  () => changeDay(1));
+document.getElementById("tt-today").addEventListener("click", () => {
+  ttDate = toLocalISO(new Date());
+  const inp = document.getElementById("tt-date-inp");
+  if (inp) inp.value = ttDate;
+  loadTimetable();
+});
+
+function changeDay(step) {
+  const dt = parseLocalDate(ttDate);
+  dt.setDate(dt.getDate() + step);
+  ttDate = toLocalISO(dt);
+  const inp = document.getElementById("tt-date-inp");
+  if (inp) inp.value = ttDate;
+  loadTimetable();
+}
+
+/* ── Modal ───────────────────────────────────────────────────── */
+
+function openAddModal(hour) {
+  modalHour = hour;
+  const overlay = document.getElementById("modal-overlay");
+  if (!overlay) return;
+  const h = String(hour).padStart(2, "0");
+  document.getElementById("m-start").value = `${h}:00`;
+  document.getElementById("m-end").value   = `${h}:00`;
+  document.getElementById("m-date").value  = ttDate;
+  document.getElementById("m-title").value = "";
+  document.getElementById("m-desc").value  = "";
+  overlay.classList.add("open");
+  setTimeout(() => document.getElementById("m-title").focus(), 100);
+}
+
+function closeModal() {
+  const overlay = document.getElementById("modal-overlay");
+  if (overlay) overlay.classList.remove("open");
+}
+
+const cancelBtn = document.getElementById("modal-cancel");
+if (cancelBtn) cancelBtn.addEventListener("click", closeModal);
+
+const overlay = document.getElementById("modal-overlay");
+if (overlay) overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
+
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
+
+const modalForm = document.getElementById("modal-form");
+if (modalForm) {
+  modalForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const title = document.getElementById("m-title").value.trim();
+    if (!title) return;
+    try {
+      await addTask({
+        title,
+        description: document.getElementById("m-desc").value.trim(),
+        due_date:    document.getElementById("m-date").value || ttDate,
+        start_time:  document.getElementById("m-start").value || null,
+        end_time:    document.getElementById("m-end").value   || null,
+      });
+      closeModal();
+      loadTimetable();
+      showToast("Task scheduled ✓");
+    } catch (err) {
+      console.error("addTask failed:", err);
+      showToast("Failed to schedule.", 4000);
     }
-
-    if(body) opts.body=JSON.stringify(body)
-
-    const r=await fetch(url,opts)
-
-    if(!r.ok){
-      console.error("API error:",r.status)
-      return []
-    }
-
-    if(method==='DELETE'||r.status===204)
-      return null
-
-    return await r.json()
-
-  }catch(err){
-
-    console.error("Network error:",err)
-    return []
-
-  }
-
+  });
 }
 
-
-/* ── Toast ───────────── */
-
-function showToast(msg){
-
-  const el=document.getElementById('toast')
-  if(!el) return
-
-  el.textContent=msg
-  el.classList.add('show')
-
-  clearTimeout(showToast._t)
-
-  showToast._t=setTimeout(()=>{
-    el.classList.remove('show')
-  },2800)
-
-}
-
-
-/* ── Current time line ───────────── */
-
-function positionNowLine(){
-
-  const now=new Date()
-  const line=document.getElementById('now-line')
-  if(!line) return
-
-  const today=now.toISOString().split('T')[0]
-
-  if(today!==ttDate){
-    line.style.display='none'
-    return
-  }
-
-  const h=now.getHours()
-  const m=now.getMinutes()
-
-  if(h<6||h>23){
-    line.style.display='none'
-    return
-  }
-
-  const row=document.querySelector(`[data-hour="${h}"]`)
-  if(!row) return
-
-  const rect=row.getBoundingClientRect()
-  const gridRect=document.getElementById('tt-grid').getBoundingClientRect()
-
-  const top=rect.top-gridRect.top+(m/60)*rect.height
-
-  line.style.display='block'
-  line.style.top=top+"px"
-
-}
-
-
-/* ── Render timetable ───────────── */
-
-function renderTimetable(){
-
-  const grid=document.getElementById('tt-grid')
-  const now=new Date()
-  const currentH=now.getHours()
-
-  document.getElementById('tt-date-label')
-  .textContent=fmtDateLabel(ttDate)
-
-  grid.innerHTML=''
-
-  HOURS.forEach(h=>{
-
-    const tasks=ttTasks.filter(t=>toHour(t.start_time)===h)
-
-    const row=document.createElement('div')
-    row.className='tt-row'
-    row.dataset.hour=h
-
-    if(ttDate===formatLocalDate(now)&&h===currentH)
-      row.classList.add('current-hour')
-
-    const hourEl=document.createElement('div')
-    hourEl.className='tt-hour'
-    hourEl.textContent=fmt12h(h)
-
-    const slot=document.createElement('div')
-    slot.className='tt-slot'
-
-    tasks.forEach(t=>{
-
-      const pill=document.createElement('div')
-      pill.className='tt-task-pill'+(t.completed?' done':'')
-
-      let timeLabel=''
-
-      if(t.start_time&&t.end_time)
-      timeLabel=`<div class="tt-time-range">
-        ${fmt12(t.start_time)} → ${fmt12(t.end_time)}
-      </div>`
-
-      pill.innerHTML=`
-      <span class="tt-pill-dot"></span>
-
-      <div class="tt-pill-content">
-        <div class="tt-pill-title">${escHtml(t.title)}</div>
-        ${timeLabel}
-      </div>
-
-      <button class="del-pill">✕</button>
-      `
-
-      pill.addEventListener('click',async e=>{
-
-        if(e.target.classList.contains('del-pill')) return
-
-        await apiCall(`/api/tasks/${t.id}`,'PUT',{
-          completed:t.completed?0:1
-        })
-
-        loadTimetable()
-
-      })
-
-      pill.querySelector('.del-pill')
-      .addEventListener('click',async e=>{
-
-        e.stopPropagation()
-
-        if(!confirm(`Delete "${t.title}"?`)) return
-
-        await apiCall(`/api/tasks/${t.id}`,'DELETE')
-
-        loadTimetable()
-
-        showToast("Deleted")
-
-      })
-
-      slot.appendChild(pill)
-
-    })
-
-    slot.addEventListener('click',e=>{
-      if(e.target.closest('.tt-task-pill')) return
-      openAddModal(h)
-    })
-
-    row.appendChild(hourEl)
-    row.appendChild(slot)
-
-    grid.appendChild(row)
-
-  })
-
-  setTimeout(positionNowLine,50)
-
-}
-
-
-/* ── Load timetable ───────────── */
-
-async function loadTimetable(){
-
-  const tasks=await apiCall(`/api/tasks?date=${ttDate}`)
-
-  ttTasks=tasks.filter(t=>t.start_time)
-
-  renderTimetable()
-
-}
-
-
-/* ── Date navigation ───────────── */
-
-document.getElementById('tt-prev')
-.addEventListener('click',()=>changeDay(-1))
-
-document.getElementById('tt-next')
-.addEventListener('click',()=>changeDay(1))
-
-document.getElementById('tt-today')
-.addEventListener('click',()=>{
-  ttDate=formatLocalDate(new Date())
-  loadTimetable()
-})
-
-function changeDay(step){
-
-  const dt=parseLocalDate(ttDate)
-  dt.setDate(dt.getDate()+step)
-
-  ttDate=formatLocalDate(dt)
-
-  loadTimetable()
-
-}
-
-
-/* ── Modal controls ───────────── */
-
-function closeModal(){
-  const overlay=document.getElementById('modal-overlay')
-  if(overlay) overlay.classList.remove('open')
-}
-
-function openAddModal(hour){
-
-  modalHour=hour
-
-  const overlay=document.getElementById('modal-overlay')
-  const h=String(hour).padStart(2,'0')
-
-  document.getElementById('m-start').value=`${h}:00`
-  document.getElementById('m-end').value=`${h}:00`
-
-  document.getElementById('m-date').value=ttDate
-  document.getElementById('m-title').value=''
-  document.getElementById('m-desc').value=''
-
-  overlay.classList.add('open')
-
-}
-
-
-/* ── Modal submit ───────────── */
-
-document.getElementById('modal-form')
-.addEventListener('submit',async e=>{
-
-  e.preventDefault()
-
-  const title=document.getElementById('m-title').value.trim()
-  if(!title) return
-
-  await apiCall('/api/tasks','POST',{
-    title,
-    description:document.getElementById('m-desc').value.trim(),
-    due_date:document.getElementById('m-date').value,
-    start_time:document.getElementById('m-start').value,
-    end_time:document.getElementById('m-end').value
-  })
-
-  closeModal()
-  loadTimetable()
-  showToast("Task scheduled")
-
-})
-
-
-/* ── Cancel button ───────────── */
-
-const cancelBtn=document.getElementById('modal-cancel')
-if(cancelBtn){
-  cancelBtn.addEventListener('click',closeModal)
-}
-
-
-/* ── Click outside modal ───────── */
-
-const overlay=document.getElementById('modal-overlay')
-if(overlay){
-  overlay.addEventListener('click',e=>{
-    if(e.target===overlay) closeModal()
-  })
-}
-
-
-/* ── ESC closes modal ───────── */
-
-document.addEventListener('keydown',e=>{
-  if(e.key==="Escape") closeModal()
-})
-
-
-/* ── Init ───────────── */
-
-syncDateInput()
-loadTimetable()
-setInterval(positionNowLine,60000)
+/* ── Init ────────────────────────────────────────────────────── */
+
+syncDateInput();
+loadTimetable();
+setInterval(positionNowLine, 60_000);

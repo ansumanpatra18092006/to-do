@@ -21,6 +21,7 @@
     </nav>
 
     <div class="page">
+
         <div class="page-header">
             <h1 class="page-title">Task <em>Calendar</em></h1>
             <p class="page-sub">See your tasks laid out across the month. Click any day for details.</p>
@@ -58,9 +59,13 @@
                 Today
             </div>
         </div>
+
     </div>
 
+    <!-- db.js must load before calendar.js -->
+    <script src="/static/db.js"></script>
     <script src="/static/calendar.js"></script>
+
 </body>
 
 </html>
